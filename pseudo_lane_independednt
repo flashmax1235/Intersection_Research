@@ -1,0 +1,77 @@
+Greedy alg:
+
+	||
+	||
+====  ====
+	||
+	||
+	
+	
+greedy_lane_dependent(VIN, speed, lane):
+
+	#constants
+	distance_to_light = 100m
+	lane_length = 3m
+	intersection_side_length = 2* lane_length
+	max_speed = 60m/s
+	min_speed = 45m/s
+	tolerance_time = intersection_side_length/[(max_Speed + min_speed)/2] (0.12s)  ---only 1 car in an intersaection at a time
+	
+	
+	
+	
+	#variables
+	data = double linked list of nodes
+	node:
+		-VIN
+		-time (at intersection)
+		
+	
+	
+	
+	MAIN:
+	
+	fate_time = speed / distance_to_light    --original arival time for lane.
+	#if: fate position is safe
+	check (data, fatetime,lane)   --check if lane is safe: (1)lane is empty at that time (2) does not cut the line in its lane
+
+
+	#else:fate position not safe  --find new position for car. 
+		look left and right of fate_time (open spot at least size of 2*tolerance)
+		does open_left fit criteria()
+		does open right fit criteria()
+		
+		if(both fit):
+			compare energy 
+			return showest energy used time
+		
+		if(one fits):
+			return one's time
+		
+		
+		
+		
+-------------------------------------------------------------
+	
+	MAIN:
+		
+		get IN:car signa/data (Message: CarCriteria, vel)	
+		check if can fit in normal time
+			-modify trajectory if not
+		
+			
+		Return: (Message: time/acceleration value)	
+			
+-------------------------------------------------------	
+		get OUT: car signal/data (Message: confirmation, CarCriteria, vel, acccel)
+			update velocity to road standard
+				-check for colition in next 100m
+					-if colition: modify acceleration values until no colition in next 100m
+		
+		Return: (Message: acceleration value)	
+	
+	
+	
+		
+		
+	
