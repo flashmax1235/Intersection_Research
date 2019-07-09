@@ -17,7 +17,7 @@ def expect(c, b, a):
 class Reservation:
 
     def toString(self):
-        return ("[ Vin: " + str(self.vin) + " ,speed: " + str(self.speed) + " ,accel: " +  str(self.accel) + " ,Entered time: " + str(self.enterTime) + " ,Lane #: " + str(self.lane)  + " ,Expected time #: " + str(self.expectedTime) + "]")
+        return ("[ Vin: " + str(self.vin) + " ,speed: " + str(self.speed) + " ,accel: " +  str(self.accel) + " ,Entered time: " + str(self.enterTime) + " ,Lane #: " + str(self.lane)  + " ,Expected time #: " + str(self.expectedTime) + " ,proposed time #: " + str(self.proposedTime) +"]")
 
 
     def __init__(self, VIN, speed, accel, enterTime, lane ):
@@ -49,8 +49,10 @@ class Intersection:  #doubly linkd list
     def __init__(self):
         self.start = 1
         self.head = Reservation(0 , 0, 0, 0, 0)
-        self.tail = Reservation(99999 , 0, 0, 0, 0)
+        self.tail = Reservation(99 , 0, 0, 0, 0)
         self.size = 0
+
+
 
 
     def find_closest(self, res):
@@ -65,7 +67,7 @@ class Intersection:  #doubly linkd list
                     temp = n
                 n = n.nextt
             if n is self.tail:
-                print("searched all, closest is VIN: " + str(temp.vin))
+                #print("searched all, closest is VIN: " + str(temp.vin))
                 return temp
 
     def addReservation(self, VIN, speed, accel, enterTime, lane):
@@ -124,40 +126,33 @@ class Intersection:  #doubly linkd list
                 self.head.nextt = new_node
                 self.head.nextt.nextt = self.tail
                 self.tail.prev = new_node
+                new_node.prev = self.head
                 return
             else:
-                current_node = self.head
-                # if next not none (tail) continue traversing
-                while current_node.nextt != self.tail:
-                    current_node = current_node.nextt
-                # if tail, add to end
-                current_node.nextt = new_node
-                # set prev pointer to current node
-                new_node.prev = current_node
-                # set new tail to new node
-                new_node.nextt = self.tail
-                self.tail.prev = new_node
+                #find closest and add before/after
+                current_node = self.find_closest(res)
+                #if res is greater or less (expected time)
+                if(current_node.expectedTime < res.expectedTime):
+                    #add after
+                    self.insertBetween(current_node,current_node.nextt,res)
+                    #print "add after closest"
+                else:
+                    #add before
+                    self.insertBetween(current_node.prev, current_node, res)
+                    #print "add before closest"
             self.size = self.size = 1
         else:
             print "When there is no room"
-            cursor = self.look_right_initial(res) # makes sure nothing in LANE is coming post-expectedTime
+            cursor = self.look_right_initial(res) # makes sure nothing in same LANE is expected after res expectedTime
             if(cursor == None): # nothing to worry about on the right
-                print "no issues regarding lane to the right"
+                print "no issues regarding lane to the right \n\n"
+
+                print "looking to the left"
                 left = self.find_open_left(res)
+                print "looking to the right"
                 right = self.find_open_right(res)
 
-                goal = self.calcEnergyNeeded(left,right)
-
-            elif(cursor == self.tail.prev.nextt):  #if last enetry is same lane   TODO:FIX bug regrding tail being incorrect
-                    print "same lane at end of list"
-                    #reservation must be at end of the list
-                    res.proposedTime = self.tail.prev.nextt.expectedTime + 0.2
-                    #within criteria?
-            else:
-                print cursor.toString()
-                left = self.find_open_left(cursor)
-                right = self.find_open_right(cursor)
-                if(left != None):
+                if (left != None):
                     print "Option on left: " + str(left.toString())
                 else:
                     print "Option on left: none"
@@ -165,16 +160,43 @@ class Intersection:  #doubly linkd list
                     print "Option on right: " + str(right.toString())
                 else:
                     print "Option on right: none"
+                #check if capable for car
+                goal = self.calcEnergyNeeded(res,left,right)
+                if(goal[0] < goal[1]):  # less energy to get to left
+                    #send data to car for plan for acceleration
+                    #adjust estimated tim
+                    res.proposedTime = left.expectedTime - inter.inter_tolerance_time
+                    res.expectedTime = 0
+                    self.insertBetween(left.prev,left,res)
+                else:
+                    # send data to car for plan for acceleration
+                    # adjust estimated tim
+                    res.proposedTime = right.expectedTime + inter.inter_tolerance_time
+                    res.expectedTime = 0
+                    self.insertBetween(right, right.nextt, res)
+            elif(cursor == self.tail.prev):  #if last enetry is same lane   TODO:FIX bug regrding tail being incorrect
+                    print "same lane at end of list"
+                    #reservation must be at end of the list
+                    res.proposedTime = self.tail.prev.nextt.expectedTime + 0.2 #expected for proposed??
+                    #within criteria?
+                    self.insertBetween(self.tail.prev,self.tail,res)
+            else:
+                print cursor.toString()
+                left = self.find_open_left(cursor)
+                right = self.find_open_right(cursor)
 
 
 
 
 
-    def calcEnergyNeeded(self):
-        #compare required energy, return
-        print "energy"
 
-    def withinCriteria(self,res):
+    def calcEnergyNeeded(self, res,option1,option2): #option1 is left search, option2 is right search
+        # compare required energy, return
+        eng1 = abs(option1.expectedTime - inter.inter_tolerance_time - res.expectedTime)
+        eng2 = abs(option1.expectedTime + inter.inter_tolerance_time - res.expectedTime)
+        return eng1,eng2
+
+    def withinCriteria(self,res,option1,option2): #option1 is left search, option2 is right search
         print "check critera"
 
     def print_as_list(self):
@@ -210,7 +232,7 @@ class Intersection:  #doubly linkd list
             n = self.head.nextt
             while n is not self.tail:  #loop until reached tail
                 if (abs(n.expectedTime - res.expectedTime) < self.inter_tolerance_time) or ((n.expectedTime  > res.expectedTime) and (n.lane == res.lane)): #(1) colision in lane  (2) line skip   TODO:specify whitch criteria it failed at
-                    print abs(n.expectedTime - res.expectedTime)
+                    #print abs(n.expectedTime - res.expectedTime)
                     print "no room"
                     return False
                 n = n.nextt
@@ -223,7 +245,6 @@ class Intersection:  #doubly linkd list
     def find_open_left(self, res):
         current_node = self.find_closest(res)
 
-        print current_node.toString()
 
         while(current_node.prev != None):
             if (abs(current_node.expectedTime - current_node.prev.expectedTime) > 2*self.inter_tolerance_time) and  (current_node.nextt.lane != res.lane): # (1) enough space  lane  (2) line skip
@@ -236,13 +257,11 @@ class Intersection:  #doubly linkd list
     def find_open_right(self, res):
         current_node = self.find_closest(res)
 
-        print current_node.toString()
-
-        while(current_node.nextt != None):
+        while(current_node.vin != 99):
             if abs(current_node.expectedTime - current_node.nextt.expectedTime) > 2*self.inter_tolerance_time:  # (1) enough space  lane
                 return current_node   # returns right node x---(x)
-            current_node = current_node.prev
-        return None
+            current_node = current_node.nextt
+        return current_node
 
     # searches all reservation to the right of closest, cannon be in the same lane, must go after
     # if none found, look_open_left is correct, if same lane found, can only look to the right from that point
@@ -255,46 +274,49 @@ class Intersection:  #doubly linkd list
             current_node =  current_node.nextt
         return last_same_lane
 
+    def insertBetween(self,spot1, spot2, info):
+        new_node = info
+        new_node.nextt = spot2
+        new_node.prev = spot1
+        spot1.nextt = new_node
+        spot2.prev = new_node
 
-
+"""-------------------------------------------------------------------------------"""
 temp = time.time()
-
-
-
 inter = Intersection()
 
 
-
 new_node = Reservation(1, 10, 0, time.time(), 1)
-inter.addReservation2(new_node)
-time.sleep(.4);
+inter.addReservation3(new_node)
+time.sleep(.18);
 
 new_node = Reservation(2, 10, 0, time.time(), 2)
-inter.addReservation2(new_node)
-time.sleep(0.15)
+inter.addReservation3(new_node)
+time.sleep(0.75)
 
 
 new_node = Reservation(3, 10, 0, time.time(), 5)
-inter.addReservation2(new_node)
-time.sleep(.13);
+inter.addReservation3(new_node)
+time.sleep(1.13);
 
 new_node = Reservation(4, 10, 0, time.time(), 9)
-inter.addReservation2(new_node)
-time.sleep(0.42)
+inter.addReservation3(new_node)
+time.sleep(0.32)
 
 new_node = Reservation(6, 10, 0, time.time(), 2)
-inter.addReservation2(new_node)
+inter.addReservation3(new_node)
 time.sleep(0.15)
 
 new_node = Reservation(7, 10, 0, time.time(), 7)
-inter.addReservation2(new_node)
+inter.addReservation3(new_node)
 time.sleep(0.1)
 
 #test
-new_node = Reservation(8, 15, 0, time.time(), 7)
+new_node = Reservation(8, 9, 1.08, time.time(), 17)
+print " ------" +str(new_node.toString())
 inter.addReservation3(new_node)
-print new_node.expectedTime
-print inter.look_right_initial(new_node).toString()
+
+#print inter.look_right_initial(new_node).toString()
 
 
 
